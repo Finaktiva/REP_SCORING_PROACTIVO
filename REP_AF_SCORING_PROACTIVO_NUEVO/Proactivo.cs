@@ -26,7 +26,7 @@ namespace REP_AF_SCORING_PROACTIVO
     {
         //Consulta en el Storage el .csv de los clientes Antiguos
         [FunctionName("Proactivo")]
-        public void Run([BlobTrigger("output/proactivo/ClienteNuevo{name}", Connection = "BlobConnecctionScoring")] Stream myBlob, string name, ILogger log)
+        public void Run([BlobTrigger("output/proactivo/{name}", Connection = "BlobConnecctionScoring")] Stream myBlob, string name, ILogger log)
         {
             log.LogInformation($"C# Blob trigger function Processed blob\n Name:{name} \n Size: {myBlob.Length} Bytes");
 
@@ -169,70 +169,70 @@ namespace REP_AF_SCORING_PROACTIVO
                     IMongoCollection<ScoProactivoNuevo> collectionNue = database.GetCollection<ScoProactivoNuevo>("sco_proactivonuevo");
                     collectionNue.InsertMany(collection);
                 }
-                //else if (blobName.Contains("Output_Modelo_Credito"))
-                //{
-                //    while ((Line = streamReader.ReadLine()) != null)
-                //    {
-                //        if (count > 0)
-                //        {
-                //            var list = Line.Split(";");
-                //            ScoProactivoAntiguo proactivo = new ScoProactivoAntiguo();
-                //            proactivo.NumeroIdentificacion = list[0];
-                //            proactivo.Razon_Social = list[1].ToString();
-                //            proactivo.IRS = list[2].ToString();
-                //            proactivo.DinamicaEconomica = list[3].ToString();
-                //            proactivo.Producto = "CREDITO";
-                //            proactivo.Riesgo = list[5].ToString();
-                //            proactivo.Riesgo_Etiquetado = list[6].ToString();
-                //            proactivo.FechaConsulta = DateTime.Now;
+                else if (blobName.Contains("Output_Modelo_Credito"))
+                {
+                    while ((Line = streamReader.ReadLine()) != null)
+                    {
+                        if (count > 0)
+                        {
+                            var list = Line.Split(";");
+                            ScoProactivoAntiguo proactivo = new ScoProactivoAntiguo();
+                            proactivo.NumeroIdentificacion = list[0];
+                            proactivo.Razon_Social = list[1].ToString();
+                            proactivo.IRS = list[2].ToString();
+                            proactivo.DinamicaEconomica = list[3].ToString();
+                            proactivo.Producto = "CREDITO";
+                            proactivo.Riesgo = list[5].ToString();
+                            proactivo.Riesgo_Etiquetado = list[6].ToString();
+                            proactivo.FechaConsulta = DateTime.Now;
 
-                //            //agregar id
-                //            //proactivoNuevo.Id_carga_input = ;
+                            //agregar id
+                            //proactivoNuevo.Id_carga_input = ;
 
-                //            Console.WriteLine(Line);
-                //            collectionAntiguo.Add(proactivo);
-                //        }
-                //        else
-                //        {
-                //            header = Line.Split(";");
-                //        }
-                //        count++;
-                //    }
-                //    IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_proactivoantiguo");
-                //    collectionNue.InsertMany(collectionAntiguo);
-                //}
-                //else if (blobName.Contains("Output_Modelo_Factoring"))
-                //{
-                //    while ((Line = streamReader.ReadLine()) != null)
-                //    {
-                //        if (count > 0)
-                //        {
-                //            var list = Line.Split(";");
-                //            ScoProactivoAntiguo proactivo = new ScoProactivoAntiguo();
-                //            proactivo.NumeroIdentificacion = list[0];
-                //            proactivo.Razon_Social = list[1].ToString();
-                //            proactivo.IRS = list[2].ToString();
-                //            proactivo.DinamicaEconomica = list[3].ToString();
-                //            proactivo.Producto = "FACTORING";
-                //            proactivo.Riesgo = list[5].ToString();
-                //            proactivo.Riesgo_Etiquetado = list[6].ToString();
-                //            proactivo.FechaConsulta = DateTime.Now;
+                            Console.WriteLine(Line);
+                            collectionAntiguo.Add(proactivo);
+                        }
+                        else
+                        {
+                            header = Line.Split(";");
+                        }
+                        count++;
+                    }
+                    IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_proactivoantiguo");
+                    collectionNue.InsertMany(collectionAntiguo);
+                }
+                else if (blobName.Contains("Output_Modelo_Factoring"))
+                {
+                    while ((Line = streamReader.ReadLine()) != null)
+                    {
+                        if (count > 0)
+                        {
+                            var list = Line.Split(";");
+                            ScoProactivoAntiguo proactivo = new ScoProactivoAntiguo();
+                            proactivo.NumeroIdentificacion = list[0];
+                            proactivo.Razon_Social = list[1].ToString();
+                            proactivo.IRS = list[2].ToString();
+                            proactivo.DinamicaEconomica = list[3].ToString();
+                            proactivo.Producto = "FACTORING";
+                            proactivo.Riesgo = list[5].ToString();
+                            proactivo.Riesgo_Etiquetado = list[6].ToString();
+                            proactivo.FechaConsulta = DateTime.Now;
 
-                //            //agregar id
-                //            //proactivoNuevo.Id_carga_input = ;
+                            //agregar id
+                            //proactivoNuevo.Id_carga_input = ;
 
-                //            Console.WriteLine(Line);
-                //            collectionAntiguo.Add(proactivo);
-                //        }
-                //        else
-                //        {
-                //            header = Line.Split(";");
-                //        }
-                //        count++;
-                //    }
-                //    IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_proactivoantiguo");
-                //    collectionNue.InsertMany(collectionAntiguo);
-                //}
+                            Console.WriteLine(Line);
+                            collectionAntiguo.Add(proactivo);
+                        }
+                        else
+                        {
+                            header = Line.Split(";");
+                        }
+                        count++;
+                    }
+                    IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_proactivoantiguo");
+                    collectionNue.InsertMany(collectionAntiguo);
+                }
 
                 var resCopy = Copy(blobName);
                 return true;
