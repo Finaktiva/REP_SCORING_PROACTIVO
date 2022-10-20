@@ -19,6 +19,11 @@ using System.Reflection.Metadata;
 using static System.Reflection.Metadata.BlobBuilder;
 using Azure;
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Bson;
+using REP_AF_SCORING_PROACTIVO_NUEVO.Model;
+using NSubstitute.Core;
+using System.Text;
+using Microsoft.Azure.Documents.Spatial;
 
 namespace REP_AF_SCORING_PROACTIVO
 {
@@ -33,11 +38,30 @@ namespace REP_AF_SCORING_PROACTIVO
             //Valida el archivo con la extension necesaria.
             if (name.Contains("csv"))
             {
-                //verificar integracion de endpoint
-                //agregar variable idcarga_input
 
-                GetBlobs(myBlob, name);
+                //AGREGAR variable idcarga_input
+                string idCarga_input = GetInputByEstatus();
+                
 
+                GetBlobs(myBlob, name, idCarga_input);
+
+            }
+        }
+
+        private string GetInputByEstatus()
+        {
+            MongoClient client = new MongoClient(Environment.GetEnvironmentVariable("MongoDBAtlasConnectionString"));
+            IMongoDatabase database = client.GetDatabase("pladik");
+            var collection = database.GetCollection<BsonDocument>("sco_cargahistoricoinputs");
+            var documents = collection.Find(new BsonDocument("Estado", 0)).FirstOrDefault();
+
+            if (documents != null)
+            {
+                return documents.First().Value.ToString();
+            }
+            else
+            {
+                return (string.Empty);
             }
         }
 
@@ -62,7 +86,7 @@ namespace REP_AF_SCORING_PROACTIVO
         }
 
         //Metodo base
-        public void GetBlobs(Stream myBlob, string name)
+        public void GetBlobs(Stream myBlob, string name, string idCarga_input)
         {
 
             Console.WriteLine(name);
@@ -70,13 +94,22 @@ namespace REP_AF_SCORING_PROACTIVO
             if (name.Contains("csv"))
             {
 
-                var res = InsertData(new StreamReader(myBlob), name);
+                var res = InsertData(new StreamReader(myBlob), name, idCarga_input);
 
+                //ACTUALIZAR ESTADO DE LA CARGA
+                MongoClient cli = new MongoClient(Environment.GetEnvironmentVariable("MongoDBAtlasConnectionString"));
+                IMongoDatabase database = cli.GetDatabase("pladik");
+                var collection = database.GetCollection<BsonDocument>("sco_cargahistoricoinputs");
+
+                //filtrar por _id
+                var filter = Builders<BsonDocument>.Filter.Eq("Estado", 0);
+                var update = Builders<BsonDocument>.Update.Set("Estado", 1);
+                collection.UpdateOne(filter, update);
             }
 
         }
 
-        public bool InsertData(StreamReader streamReader, string blobName)
+        public bool InsertData(StreamReader streamReader, string blobName, string idCarga_input)
         {
 
             try
@@ -123,9 +156,7 @@ namespace REP_AF_SCORING_PROACTIVO
                             proactivoNuevo.Total_patrimonio = list[23].ToString();
                             proactivoNuevo.Ingresos = list[24].ToString();
                             proactivoNuevo.FechaConsulta = DateTime.Now;
-
-                            //agregar id
-                            //proactivoNuevo.Id_carga_input = ;
+                            proactivoNuevo.Id_carga_input = idCarga_input;
 
                             Console.WriteLine(Line);
                             collection.Add(proactivoNuevo);
@@ -136,7 +167,7 @@ namespace REP_AF_SCORING_PROACTIVO
                         }
                         count++;
                     }
-                    IMongoCollection<ScoProactivoNuevo> collectionNue = database.GetCollection<ScoProactivoNuevo>("sco_proactivonuevo");
+                    IMongoCollection<ScoProactivoNuevo> collectionNue = database.GetCollection<ScoProactivoNuevo>("sco_proactivonuevos");
                     collectionNue.InsertMany(collection);
 
                 }
@@ -153,9 +184,7 @@ namespace REP_AF_SCORING_PROACTIVO
                             proactivoNuevo.Calificacion = list[2].ToString();
                             proactivoNuevo.Producto = "LIBERA";
                             proactivoNuevo.FechaConsulta = DateTime.Now;
-
-                            //agregar id
-                            //proactivoNuevo.Id_carga_input = ;
+                            proactivoNuevo.Id_carga_input = idCarga_input;
 
                             Console.WriteLine(Line);
                             collection.Add(proactivoNuevo);
@@ -166,7 +195,7 @@ namespace REP_AF_SCORING_PROACTIVO
                         }
                         count++;
                     }
-                    IMongoCollection<ScoProactivoNuevo> collectionNue = database.GetCollection<ScoProactivoNuevo>("sco_proactivonuevo");
+                    IMongoCollection<ScoProactivoNuevo> collectionNue = database.GetCollection<ScoProactivoNuevo>("sco_proactivonuevos");
                     collectionNue.InsertMany(collection);
                 }
                 else if (blobName.Contains("Output_Modelo_Credito"))
@@ -185,9 +214,7 @@ namespace REP_AF_SCORING_PROACTIVO
                             proactivo.Riesgo = list[5].ToString();
                             proactivo.Riesgo_Etiquetado = list[6].ToString();
                             proactivo.FechaConsulta = DateTime.Now;
-
-                            //agregar id
-                            //proactivoNuevo.Id_carga_input = ;
+                            proactivo.Id_carga_input = idCarga_input;
 
                             Console.WriteLine(Line);
                             collectionAntiguo.Add(proactivo);
@@ -198,7 +225,7 @@ namespace REP_AF_SCORING_PROACTIVO
                         }
                         count++;
                     }
-                    IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_proactivoantiguo");
+                    IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_proactivoantiguos");
                     collectionNue.InsertMany(collectionAntiguo);
                 }
                 else if (blobName.Contains("Output_Modelo_Factoring"))
@@ -217,9 +244,7 @@ namespace REP_AF_SCORING_PROACTIVO
                             proactivo.Riesgo = list[5].ToString();
                             proactivo.Riesgo_Etiquetado = list[6].ToString();
                             proactivo.FechaConsulta = DateTime.Now;
-
-                            //agregar id
-                            //proactivoNuevo.Id_carga_input = ;
+                            proactivo.Id_carga_input = idCarga_input;
 
                             Console.WriteLine(Line);
                             collectionAntiguo.Add(proactivo);
@@ -230,7 +255,7 @@ namespace REP_AF_SCORING_PROACTIVO
                         }
                         count++;
                     }
-                    IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_proactivoantiguo");
+                    IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_proactivoantiguos");
                     collectionNue.InsertMany(collectionAntiguo);
                 }
 
