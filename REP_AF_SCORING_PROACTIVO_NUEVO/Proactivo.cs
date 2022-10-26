@@ -24,15 +24,22 @@ using REP_AF_SCORING_PROACTIVO_NUEVO.Model;
 using NSubstitute.Core;
 using System.Text;
 using Microsoft.Azure.Documents.Spatial;
+using System.Threading.Tasks;
+using Microsoft.VisualBasic;
+using System.Runtime.CompilerServices;
 
 namespace REP_AF_SCORING_PROACTIVO
 {
     public class Proactivo
     {
+
+        public static List<Utility> utilidad = new List<Utility>();
+
         //Consulta en el Storage el .csv de los clientes Antiguos
         [FunctionName("Proactivo")]
-        public void Run([BlobTrigger("output/proactivo/{name}", Connection = "BlobConnecctionScoring")] Stream myBlob, string name, ILogger log)
+        public static async Task Run([BlobTrigger("output/proactivo/{name}", Connection = "BlobConnecctionScoring")] Stream myBlob, string name, ILogger log)
         {
+
             log.LogInformation($"C# Blob trigger function Processed blob\n Name:{name} \n Size: {myBlob.Length} Bytes");
 
             //Valida el archivo con la extension necesaria.
@@ -40,20 +47,55 @@ namespace REP_AF_SCORING_PROACTIVO
             {
 
                 //AGREGAR variable idcarga_input
-                string idCarga_input = GetInputByEstatus();
+                string idCarga_input =await GetInputByEstatus();
+
+                if (!string.IsNullOrEmpty(idCarga_input))
+                {
+
+                    await GetBlobs(myBlob, name, idCarga_input);
+
+                    if (utilidad.Count >= 4)
+                    {
+                        bool control = true;
+
+                        foreach (var item in utilidad)
+                        {
+                            if (!item.estadocopia)
+                            {
+                                control = false;
+                            } 
+
+                        }
+
+                        if (control)
+                        {
+                            //ACTUALIZAR ESTADO DE LA CARGA
+                            MongoClient cli = new MongoClient(Environment.GetEnvironmentVariable("MongoDBAtlasConnectionString"));
+                            IMongoDatabase database = cli.GetDatabase("pladik");
+                            var collection = database.GetCollection<BsonDocument>("sco_cargahistoricoinputs");
+
+                            //filtrar por _id
+                            var filter = Builders<BsonDocument>.Filter.Eq("Estado", 0);
+                            var update = Builders<BsonDocument>.Update.Set("Estado", 1);
+                            collection.UpdateOne(filter, update);
+                        }
+
+                    }
+
+                }
                 
-
-                GetBlobs(myBlob, name, idCarga_input);
-
             }
+
         }
 
-        private string GetInputByEstatus()
+        
+
+        private static async Task<string>  GetInputByEstatus()
         {
             MongoClient client = new MongoClient(Environment.GetEnvironmentVariable("MongoDBAtlasConnectionString"));
             IMongoDatabase database = client.GetDatabase("pladik");
             var collection = database.GetCollection<BsonDocument>("sco_cargahistoricoinputs");
-            var documents = collection.Find(new BsonDocument("Estado", 0)).FirstOrDefault();
+            var documents = await collection.FindAsync(new BsonDocument("Estado", 0)).Result.FirstOrDefaultAsync();
 
             if (documents != null)
             {
@@ -66,8 +108,9 @@ namespace REP_AF_SCORING_PROACTIVO
         }
 
         //Mover de una carpeta a otra
-        public bool Copy(string name)
-        {
+        public static bool Copy(string name)
+        {          
+
             string storageConnectionString = Environment.GetEnvironmentVariable("BlobConnecctionScoring");
 
             string containerName = Environment.GetEnvironmentVariable("ContainerName");
@@ -79,37 +122,45 @@ namespace REP_AF_SCORING_PROACTIVO
                 var blobClient = blobContainerClient.GetBlobClient("proactivo/" + name);
                 var blobsCopy = blobContainerClientCopy.GetBlobClient($"{Environment.GetEnvironmentVariable("blobCopy")}{name}");
                 blobsCopy.StartCopyFromUri(blobClient.Uri);
-                blobClient.Delete();               
-            }
-            return true;
+                var response = blobClient.Delete();
 
+                Console.WriteLine("HA BORRRADO "+name);
+
+                return true;
+
+            }
+            else
+            {
+                return false;
+            }
+            
         }
 
         //Metodo base
-        public void GetBlobs(Stream myBlob, string name, string idCarga_input)
+        public static async Task GetBlobs(Stream myBlob, string name, string idCarga_input)
         {
+
+            Utility respuestainsert = new Utility();
 
             Console.WriteLine(name);
 
             if (name.Contains("csv"))
             {
 
-                var res = InsertData(new StreamReader(myBlob), name, idCarga_input);
+                var res =await InsertData(new StreamReader(myBlob), name, idCarga_input);
+             
+                respuestainsert.archivo = name;
+                respuestainsert.estadocopia = res;             
+            }
 
-                //ACTUALIZAR ESTADO DE LA CARGA
-                MongoClient cli = new MongoClient(Environment.GetEnvironmentVariable("MongoDBAtlasConnectionString"));
-                IMongoDatabase database = cli.GetDatabase("pladik");
-                var collection = database.GetCollection<BsonDocument>("sco_cargahistoricoinputs");
-
-                //filtrar por _id
-                var filter = Builders<BsonDocument>.Filter.Eq("Estado", 0);
-                var update = Builders<BsonDocument>.Update.Set("Estado", 1);
-                collection.UpdateOne(filter, update);
+            if ( !string.IsNullOrEmpty(respuestainsert.archivo))
+            {
+                utilidad.Add(respuestainsert);
             }
 
         }
 
-        public bool InsertData(StreamReader streamReader, string blobName, string idCarga_input)
+        public static async Task<bool> InsertData(StreamReader streamReader, string blobName, string idCarga_input)
         {
 
             try
@@ -167,8 +218,14 @@ namespace REP_AF_SCORING_PROACTIVO
                         }
                         count++;
                     }
-                    IMongoCollection<ScoProactivoNuevo> collectionNue = database.GetCollection<ScoProactivoNuevo>("sco_proactivonuevos");
-                    collectionNue.InsertMany(collection);
+                    
+                    if (collection.Count>0)
+                    {
+                        IMongoCollection<ScoProactivoNuevo> collectionNue = database.GetCollection<ScoProactivoNuevo>("sco_proactivonuevos");
+                        await collectionNue.InsertManyAsync(collection);
+                        
+                    }
+                    return Copy(blobName);
 
                 }
                 else if (blobName.Contains("Output_Informacion_libera"))
@@ -195,8 +252,14 @@ namespace REP_AF_SCORING_PROACTIVO
                         }
                         count++;
                     }
-                    IMongoCollection<ScoProactivoNuevo> collectionNue = database.GetCollection<ScoProactivoNuevo>("sco_proactivonuevos");
-                    collectionNue.InsertMany(collection);
+                    
+                    if (collection.Count > 0)
+                    {
+                        IMongoCollection<ScoProactivoNuevo> collectionNue = database.GetCollection<ScoProactivoNuevo>("sco_proactivonuevos");
+                        await collectionNue.InsertManyAsync(collection);
+                        
+                    }
+                    return Copy(blobName);
                 }
                 else if (blobName.Contains("Output_Modelo_Credito"))
                 {
@@ -225,8 +288,13 @@ namespace REP_AF_SCORING_PROACTIVO
                         }
                         count++;
                     }
-                    IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_proactivoantiguos");
-                    collectionNue.InsertMany(collectionAntiguo);
+                    if (collectionAntiguo.Count > 0)
+                    {
+                        IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_proactivoantiguos");
+                        await collectionNue.InsertManyAsync(collectionAntiguo);
+                        
+                    }
+                    return Copy(blobName);
                 }
                 else if (blobName.Contains("Output_Modelo_Factoring"))
                 {
@@ -255,12 +323,16 @@ namespace REP_AF_SCORING_PROACTIVO
                         }
                         count++;
                     }
-                    IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_proactivoantiguos");
-                    collectionNue.InsertMany(collectionAntiguo);
+                    if (collectionAntiguo.Count > 0)
+                    {
+                        IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_proactivoantiguos");
+                        await collectionNue.InsertManyAsync(collectionAntiguo);
+                        
+                    }
+                    return Copy(blobName);
                 }
 
-                var resCopy = Copy(blobName);
-                return true;
+                return false;
             }
             catch (Exception ex)
             {
@@ -268,4 +340,5 @@ namespace REP_AF_SCORING_PROACTIVO
             }
         }
     }
+
 }
