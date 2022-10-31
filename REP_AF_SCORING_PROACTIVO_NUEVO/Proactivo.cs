@@ -1,14 +1,14 @@
+using Azure.Storage.Blobs;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Extensions.Logging;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using REP_AF_SCORING_PROACTIVO.Model;
+using REP_AF_SCORING_PROACTIVO_NUEVO.Model;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Azure.Storage.Blobs;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Extensions.Logging;
-using MongoDB.Driver;
-using REP_AF_SCORING_PROACTIVO.Model;
-using MongoDB.Bson;
-using REP_AF_SCORING_PROACTIVO_NUEVO.Model;
 using System.Threading.Tasks;
 
 namespace REP_AF_SCORING_PROACTIVO
@@ -149,7 +149,7 @@ namespace REP_AF_SCORING_PROACTIVO
 
         }
 
-        public static async Task<string> InsertData(StreamReader streamReader, string blobName, string idCarga_input, string idCarga_inactivo) 
+        public static async Task<string> InsertData(StreamReader streamReader, string blobName, string idCarga_input, string idCarga_inactivo)
         {
 
             try
@@ -157,7 +157,8 @@ namespace REP_AF_SCORING_PROACTIVO
                 MongoClient client = new MongoClient(Environment.GetEnvironmentVariable("MongoDBAtlasConnectionString"));
                 var collection = new List<ScoProactivoNuevo>();
                 var collectionAntiguo = new List<ScoProactivoAntiguo>();
-                var collectionInactivo = new List<ScoInactivoFinanciero>();
+                var collectionInactivo = new List<ScoInactivo>();
+                //var collectionInactivo = new List<ScoInactivoFinanciero>();
                 string[] header = { };
                 string Line;
                 int count = 0;
@@ -323,6 +324,8 @@ namespace REP_AF_SCORING_PROACTIVO
                             proactivo.FechaConsulta = DateTime.Now;
                             proactivo.Id_carga_input = idCarga_input;
 
+
+
                             Console.WriteLine(Line);
                             collectionAntiguo.Add(proactivo);
                         }
@@ -344,9 +347,9 @@ namespace REP_AF_SCORING_PROACTIVO
                         return ("PROACTIVO");
                     }
                 }
-                
+
                 //MODELO INACTIVO ANTIGUO CREDITO
-                else if (blobName.Contains("Output_Flujo_Inactivo_Modelo_Credito"))
+                else if (blobName.Contains("Output_Flujo_Inactivo_Modelo_Credito") || blobName.Contains("Output_Flujo_Inactivo_Modelo_Factoring"))
                 {
                     while ((Line = streamReader.ReadLine()) != null)
                     {
@@ -355,19 +358,24 @@ namespace REP_AF_SCORING_PROACTIVO
                             var list = Line.Split(";");
 
                             //SE USA LA SIGUIENTE COLECCION YA QUE LOS MODELOS SON IGUALES 
-                            ScoProactivoAntiguo proactivo = new ScoProactivoAntiguo();
-                            proactivo.NumeroIdentificacion = list[0];
-                            proactivo.Razon_Social = list[1].ToString();
-                            proactivo.IRS = list[2].ToString();
-                            proactivo.DinamicaEconomica = list[3].ToString();
-                            proactivo.Producto = "Credito/Confirming";
-                            proactivo.Riesgo = list[5].ToString();
-                            proactivo.Riesgo_Etiquetado = list[6].ToString();
-                            proactivo.FechaConsulta = DateTime.Now;
-                            proactivo.Id_carga_input = idCarga_inactivo;
+                            ScoInactivo inactivo = new ScoInactivo
+                            {
+                                NumeroIdentificacion = list[0],
+                                Razon_Social = list[1].ToString(),
+                                Producto = list[4],
+                                Riesgo = list[5].ToString(),
+                                Riesgo_Etiquetado = list[6].ToString(),
+                                FechaConsulta = DateTime.Now,
+                                Id_carga_inactivo = idCarga_inactivo
+                            };
 
+                            for (int i = 2; i < (header.Length - 3); i++)
+                            {
+                                inactivo.Variables.Headers.Add(header[i]);
+                                inactivo.Variables.Values.Add(list[i]);
+                            }
                             Console.WriteLine(Line);
-                            collectionAntiguo.Add(proactivo);
+                            collectionInactivo.Add(inactivo);
                         }
                         else
                         {
@@ -375,10 +383,10 @@ namespace REP_AF_SCORING_PROACTIVO
                         }
                         count++;
                     }
-                    if (collectionAntiguo.Count > 0)
+                    if (collectionInactivo.Count > 0)
                     {
-                        IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_inactivoantiguos");
-                        await collectionNue.InsertManyAsync(collectionAntiguo);
+                        IMongoCollection<ScoInactivo> collectionNue = database.GetCollection<ScoInactivo>("sco_inactivos");
+                        await collectionNue.InsertManyAsync(collectionInactivo);
 
                     }
                     bool retornoCopy = Copy(blobName);
@@ -388,48 +396,7 @@ namespace REP_AF_SCORING_PROACTIVO
                     }
                 }
 
-                //MODELO INACTIVO ANTIGUO FACTORING
-                else if (blobName.Contains("Output_Flujo_Inactivo_Modelo_Factoring"))
-                {
-                    while ((Line = streamReader.ReadLine()) != null)
-                    {
-                        if (count > 0)
-                        {
-                            var list = Line.Split(";");
 
-                            //SE USA LA SIGUIENTE COLECCION YA QUE LOS MODELOS SON IGUALES 
-                            ScoProactivoAntiguo proactivo = new ScoProactivoAntiguo();
-                            proactivo.NumeroIdentificacion = list[0];
-                            proactivo.Razon_Social = list[1].ToString();
-                            proactivo.IRS = list[2].ToString();
-                            proactivo.DinamicaEconomica = list[3].ToString();
-                            proactivo.Producto = "INACTIVO/FACTORING";
-                            proactivo.Riesgo = list[5].ToString();
-                            proactivo.Riesgo_Etiquetado = list[6].ToString();
-                            proactivo.FechaConsulta = DateTime.Now;
-                            proactivo.Id_carga_input = idCarga_inactivo;
-
-                            Console.WriteLine(Line);
-                            collectionAntiguo.Add(proactivo);
-                        }
-                        else
-                        {
-                            header = Line.Split(";");
-                        }
-                        count++;
-                    }
-                    if (collectionAntiguo.Count > 0)
-                    {
-                        IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_inactivoantiguos");
-                        await collectionNue.InsertManyAsync(collectionAntiguo);
-
-                    }
-                    bool retornoCopy = Copy(blobName);
-                    if (retornoCopy)
-                    {
-                        return ("INACTIVO");
-                    }
-                }
 
                 //MODELO INACTIVO ANTIGUO FINANCIERO
                 else if (blobName.Contains("Output_Flujo_Inactivo_Modelo_Financiero"))
@@ -440,34 +407,19 @@ namespace REP_AF_SCORING_PROACTIVO
                         {
                             var list = Line.Split(";");
 
-                            ScoInactivoFinanciero inactivoFinanciero = new ScoInactivoFinanciero();
-                            inactivoFinanciero.NIT = list[0];
-                            inactivoFinanciero.Producto = "INACTIVO/FINANCIERO";
-                            inactivoFinanciero.Riesgo = list[1].ToString();
-                            inactivoFinanciero.MacroSector = list[2].ToString();
-                            inactivoFinanciero.Sector = list[3].ToString();
-                            inactivoFinanciero.Act_economica = list[4].ToString();
-                            inactivoFinanciero.Cartera = list[5].ToString();
-                            inactivoFinanciero.Activo_Cte = list[6].ToString();
-                            inactivoFinanciero.Cartera_AnioAnterior = list[7].ToString();
-                            inactivoFinanciero.Inventario = list[8].ToString();
-                            inactivoFinanciero.Inventario_AnioAnterior = list[9].ToString();
-                            inactivoFinanciero.Pasivo_Cte = list[10].ToString();
-                            inactivoFinanciero.Obligaciones_Financieras = list[11].ToString();
-                            inactivoFinanciero.Proveedores = list[12].ToString();
-                            inactivoFinanciero.Proveedores_AnioAnterior = list[13].ToString();
-                            inactivoFinanciero.Costos = list[14].ToString();
-                            inactivoFinanciero.Utilidad_Operacional = list[15].ToString();
-                            inactivoFinanciero.Gastos_no_Operativos = list[16].ToString();
-                            inactivoFinanciero.Utilidad_Neta = list[17].ToString();
-                            inactivoFinanciero.Ebitda = list[18].ToString();
-                            inactivoFinanciero.Total_de_activos = list[19].ToString();
-                            inactivoFinanciero.Total_pasivo = list[20].ToString();
-                            inactivoFinanciero.Total_patrimonio = list[21].ToString();
-                            inactivoFinanciero.Ingresos = list[22].ToString();
-                            inactivoFinanciero.FechaConsulta = DateTime.Now;
-                            inactivoFinanciero.Id_carga_inactivo = idCarga_inactivo;
+                            ScoInactivo inactivoFinanciero = new ScoInactivo
+                            {
+                                NumeroIdentificacion = list[0],
+                                Producto = "Financiero",
+                                Riesgo = list[1].ToString()
 
+                            };
+                            for (int i = 2; i < (header.Length); i++)
+                            {
+                                inactivoFinanciero.Variables.Headers.Add(header[i]);
+                                inactivoFinanciero.Variables.Values.Add(list[i]);
+                            }
+                            inactivoFinanciero.Id_carga_inactivo = idCarga_inactivo;
                             Console.WriteLine(Line);
                             collectionInactivo.Add(inactivoFinanciero);
                         }
@@ -478,11 +430,10 @@ namespace REP_AF_SCORING_PROACTIVO
                         count++;
                     }
 
-                    if (collection.Count > 0)
+                    if (collectionInactivo.Count > 0)
                     {
-                        IMongoCollection<ScoInactivoFinanciero> collectionNue = database.GetCollection<ScoInactivoFinanciero>("sco_inactivoantiguosfinanciero");
+                        IMongoCollection<ScoInactivo> collectionNue = database.GetCollection<ScoInactivo>("sco_inactivos");
                         await collectionNue.InsertManyAsync(collectionInactivo);
-
                     }
                     bool retornoCopy = Copy(blobName);
                     if (retornoCopy)
