@@ -15,8 +15,8 @@ namespace REP_AF_SCORING_PROACTIVO_NUEVO.Model
             FechaConsulta = DateTime.Now.Date;
         }
 
-        [BsonElement("NumeroIdentificacion")]
-        public string NumeroIdentificacion { get; set; }
+        [BsonElement("NIT")]
+        public string NIT { get; set; }
 
         [BsonElement("Riesgo")]
         public string Riesgo { get; set; }

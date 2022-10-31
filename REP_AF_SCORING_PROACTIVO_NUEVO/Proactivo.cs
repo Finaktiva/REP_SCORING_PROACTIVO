@@ -36,15 +36,15 @@ namespace REP_AF_SCORING_PROACTIVO
                     idCarga_input = await GetInputByEstatus();
                 }
 
-                //if (string.IsNullOrEmpty(idCarga_inactivo))
-                //{
-                //    //SE CARGA EL ID DEL HISTORICO INACTIVO
-                //    idCarga_inactivo = await GetIdHistoricoInactivo();
-                //}
+                if (string.IsNullOrEmpty(idCarga_inactivo))
+                {
+                    //SE CARGA EL ID DEL HISTORICO INACTIVO
+                    idCarga_inactivo = await GetIdHistoricoInactivo();
+                }
 
 
 
-                if (!string.IsNullOrEmpty(idCarga_input))
+                if (!string.IsNullOrEmpty(idCarga_input) || !string.IsNullOrEmpty(idCarga_inactivo))
                 {
 
                     //REALIZAMOS LOS INSERT
@@ -64,19 +64,19 @@ namespace REP_AF_SCORING_PROACTIVO
                         collection.UpdateOne(filter, update);
                     }
 
-                    
-                    //if (control == "INACTIVO")
-                    //{
-                    //    //ACTUALIZAR ESTADO DE LA CARGA EN HISTORICO INACTIVO
-                    //    MongoClient cli = new MongoClient(Environment.GetEnvironmentVariable("MongoDBAtlasConnectionString"));
-                    //    IMongoDatabase database = cli.GetDatabase("pladik");
-                    //    var collection = database.GetCollection<BsonDocument>("sco_cargahistoricoinactivos");
 
-                    //    //filtrar por _id
-                    //    var filter = Builders<BsonDocument>.Filter.Eq("Estado", 0);
-                    //    var update = Builders<BsonDocument>.Update.Set("Estado", 1);
-                    //    collection.UpdateOne(filter, update);
-                    //}
+                    if (control == "INACTIVO")
+                    {
+                        //ACTUALIZAR ESTADO DE LA CARGA EN HISTORICO INACTIVO
+                        MongoClient cli = new MongoClient(Environment.GetEnvironmentVariable("MongoDBAtlasConnectionString"));
+                        IMongoDatabase database = cli.GetDatabase("pladik");
+                        var collection = database.GetCollection<BsonDocument>("sco_cargahistoricoinactivos");
+
+                        //filtrar por _id
+                        var filter = Builders<BsonDocument>.Filter.Eq("Estado", 0);
+                        var update = Builders<BsonDocument>.Update.Set("Estado", 1);
+                        collection.UpdateOne(filter, update);
+                    }
 
                 }
 
@@ -344,155 +344,156 @@ namespace REP_AF_SCORING_PROACTIVO
                         return ("PROACTIVO");
                     }
                 }
+                
+                //MODELO INACTIVO ANTIGUO CREDITO
+                else if (blobName.Contains("Output_Flujo_Inactivo_Modelo_Credito"))
+                {
+                    while ((Line = streamReader.ReadLine()) != null)
+                    {
+                        if (count > 0)
+                        {
+                            var list = Line.Split(";");
+
+                            //SE USA LA SIGUIENTE COLECCION YA QUE LOS MODELOS SON IGUALES 
+                            ScoProactivoAntiguo proactivo = new ScoProactivoAntiguo();
+                            proactivo.NumeroIdentificacion = list[0];
+                            proactivo.Razon_Social = list[1].ToString();
+                            proactivo.IRS = list[2].ToString();
+                            proactivo.DinamicaEconomica = list[3].ToString();
+                            proactivo.Producto = "Credito/Confirming";
+                            proactivo.Riesgo = list[5].ToString();
+                            proactivo.Riesgo_Etiquetado = list[6].ToString();
+                            proactivo.FechaConsulta = DateTime.Now;
+                            proactivo.Id_carga_input = idCarga_inactivo;
+
+                            Console.WriteLine(Line);
+                            collectionAntiguo.Add(proactivo);
+                        }
+                        else
+                        {
+                            header = Line.Split(";");
+                        }
+                        count++;
+                    }
+                    if (collectionAntiguo.Count > 0)
+                    {
+                        IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_inactivoantiguos");
+                        await collectionNue.InsertManyAsync(collectionAntiguo);
+
+                    }
+                    bool retornoCopy = Copy(blobName);
+                    if (retornoCopy)
+                    {
+                        return ("INACTIVO");
+                    }
+                }
+
+                //MODELO INACTIVO ANTIGUO FACTORING
+                else if (blobName.Contains("Output_Flujo_Inactivo_Modelo_Factoring"))
+                {
+                    while ((Line = streamReader.ReadLine()) != null)
+                    {
+                        if (count > 0)
+                        {
+                            var list = Line.Split(";");
+
+                            //SE USA LA SIGUIENTE COLECCION YA QUE LOS MODELOS SON IGUALES 
+                            ScoProactivoAntiguo proactivo = new ScoProactivoAntiguo();
+                            proactivo.NumeroIdentificacion = list[0];
+                            proactivo.Razon_Social = list[1].ToString();
+                            proactivo.IRS = list[2].ToString();
+                            proactivo.DinamicaEconomica = list[3].ToString();
+                            proactivo.Producto = "INACTIVO/FACTORING";
+                            proactivo.Riesgo = list[5].ToString();
+                            proactivo.Riesgo_Etiquetado = list[6].ToString();
+                            proactivo.FechaConsulta = DateTime.Now;
+                            proactivo.Id_carga_input = idCarga_inactivo;
+
+                            Console.WriteLine(Line);
+                            collectionAntiguo.Add(proactivo);
+                        }
+                        else
+                        {
+                            header = Line.Split(";");
+                        }
+                        count++;
+                    }
+                    if (collectionAntiguo.Count > 0)
+                    {
+                        IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_inactivoantiguos");
+                        await collectionNue.InsertManyAsync(collectionAntiguo);
+
+                    }
+                    bool retornoCopy = Copy(blobName);
+                    if (retornoCopy)
+                    {
+                        return ("INACTIVO");
+                    }
+                }
+
+                //MODELO INACTIVO ANTIGUO FINANCIERO
+                else if (blobName.Contains("Output_Flujo_Inactivo_Modelo_Financiero"))
+                {
+                    while ((Line = streamReader.ReadLine()) != null)
+                    {
+                        if (count > 0)
+                        {
+                            var list = Line.Split(";");
+
+                            ScoInactivoFinanciero inactivoFinanciero = new ScoInactivoFinanciero();
+                            inactivoFinanciero.NIT = list[0];
+                            inactivoFinanciero.Producto = "INACTIVO/FINANCIERO";
+                            inactivoFinanciero.Riesgo = list[1].ToString();
+                            inactivoFinanciero.MacroSector = list[2].ToString();
+                            inactivoFinanciero.Sector = list[3].ToString();
+                            inactivoFinanciero.Act_economica = list[4].ToString();
+                            inactivoFinanciero.Cartera = list[5].ToString();
+                            inactivoFinanciero.Activo_Cte = list[6].ToString();
+                            inactivoFinanciero.Cartera_AnioAnterior = list[7].ToString();
+                            inactivoFinanciero.Inventario = list[8].ToString();
+                            inactivoFinanciero.Inventario_AnioAnterior = list[9].ToString();
+                            inactivoFinanciero.Pasivo_Cte = list[10].ToString();
+                            inactivoFinanciero.Obligaciones_Financieras = list[11].ToString();
+                            inactivoFinanciero.Proveedores = list[12].ToString();
+                            inactivoFinanciero.Proveedores_AnioAnterior = list[13].ToString();
+                            inactivoFinanciero.Costos = list[14].ToString();
+                            inactivoFinanciero.Utilidad_Operacional = list[15].ToString();
+                            inactivoFinanciero.Gastos_no_Operativos = list[16].ToString();
+                            inactivoFinanciero.Utilidad_Neta = list[17].ToString();
+                            inactivoFinanciero.Ebitda = list[18].ToString();
+                            inactivoFinanciero.Total_de_activos = list[19].ToString();
+                            inactivoFinanciero.Total_pasivo = list[20].ToString();
+                            inactivoFinanciero.Total_patrimonio = list[21].ToString();
+                            inactivoFinanciero.Ingresos = list[22].ToString();
+                            inactivoFinanciero.FechaConsulta = DateTime.Now;
+                            inactivoFinanciero.Id_carga_inactivo = idCarga_inactivo;
+
+                            Console.WriteLine(Line);
+                            collectionInactivo.Add(inactivoFinanciero);
+                        }
+                        else
+                        {
+                            header = Line.Split(";");
+                        }
+                        count++;
+                    }
+
+                    if (collection.Count > 0)
+                    {
+                        IMongoCollection<ScoInactivoFinanciero> collectionNue = database.GetCollection<ScoInactivoFinanciero>("sco_inactivoantiguosfinanciero");
+                        await collectionNue.InsertManyAsync(collectionInactivo);
+
+                    }
+                    bool retornoCopy = Copy(blobName);
+                    if (retornoCopy)
+                    {
+                        return ("INACTIVO");
+                    }
+                }
                 else
                 {
                     return "";
                 }
-                ////MODELO INACTIVO ANTIGUO CREDITO
-                //else if (blobName.Contains("Output_Flujo_Inactivo_Modelo_Credito"))
-                //{
-                //    while ((Line = streamReader.ReadLine()) != null)
-                //    {
-                //        if (count > 0)
-                //        {
-                //            var list = Line.Split(";");
-
-                //            //SE USA LA SIGUIENTE COLECCION YA QUE LOS MODELOS SON IGUALES 
-                //            ScoProactivoAntiguo proactivo = new ScoProactivoAntiguo();
-                //            proactivo.NumeroIdentificacion = list[0];
-                //            proactivo.Razon_Social = list[1].ToString();
-                //            proactivo.IRS = list[2].ToString();
-                //            proactivo.DinamicaEconomica = list[3].ToString();
-                //            proactivo.Producto = "Credito/Confirming";
-                //            proactivo.Riesgo = list[5].ToString();
-                //            proactivo.Riesgo_Etiquetado = list[6].ToString();
-                //            proactivo.FechaConsulta = DateTime.Now;
-                //            proactivo.Id_carga_input = idCarga_inactivo;
-
-                //            Console.WriteLine(Line);
-                //            collectionAntiguo.Add(proactivo);
-                //        }
-                //        else
-                //        {
-                //            header = Line.Split(";");
-                //        }
-                //        count++;
-                //    }
-                //    if (collectionAntiguo.Count > 0)
-                //    {
-                //        IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_inactivoantiguos");
-                //        await collectionNue.InsertManyAsync(collectionAntiguo);
-
-                //    }
-                //    bool retornoCopy = Copy(blobName);
-                //    if (retornoCopy)
-                //    {
-                //        return ("INACTIVO");
-                //    }
-                //}
-
-                ////MODELO INACTIVO ANTIGUO FACTORING
-                //else if (blobName.Contains("Output_Flujo_Inactivo_Modelo_Factoring"))
-                //{
-                //    while ((Line = streamReader.ReadLine()) != null)
-                //    {
-                //        if (count > 0)
-                //        {
-                //            var list = Line.Split(";");
-
-                //            //SE USA LA SIGUIENTE COLECCION YA QUE LOS MODELOS SON IGUALES 
-                //            ScoProactivoAntiguo proactivo = new ScoProactivoAntiguo();
-                //            proactivo.NumeroIdentificacion = list[0];
-                //            proactivo.Razon_Social = list[1].ToString();
-                //            proactivo.IRS = list[2].ToString();
-                //            proactivo.DinamicaEconomica = list[3].ToString();
-                //            proactivo.Producto = "INACTIVO/FACTORING";
-                //            proactivo.Riesgo = list[5].ToString();
-                //            proactivo.Riesgo_Etiquetado = list[6].ToString();
-                //            proactivo.FechaConsulta = DateTime.Now;
-                //            proactivo.Id_carga_input = idCarga_inactivo;
-
-                //            Console.WriteLine(Line);
-                //            collectionAntiguo.Add(proactivo);
-                //        }
-                //        else
-                //        {
-                //            header = Line.Split(";");
-                //        }
-                //        count++;
-                //    }
-                //    if (collectionAntiguo.Count > 0)
-                //    {
-                //        IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_inactivoantiguos");
-                //        await collectionNue.InsertManyAsync(collectionAntiguo);
-
-                //    }
-                //    bool retornoCopy = Copy(blobName);
-                //    if (retornoCopy)
-                //    {
-                //        return ("INACTIVO");
-                //    }
-                //}
-
-                ////MODELO INACTIVO ANTIGUO FINANCIERO
-                //else if (blobName.Contains("Output_Flujo_Inactivo_Modelo_Financiero"))
-                //{
-                //    while ((Line = streamReader.ReadLine()) != null)
-                //    {
-                //        if (count > 0)
-                //        {
-                //            var list = Line.Split(";");
-
-                //            ScoInactivoFinanciero inactivoFinanciero = new ScoInactivoFinanciero();
-                //            inactivoFinanciero.NumeroIdentificacion = list[0];
-                //            inactivoFinanciero.Producto = "INACTIVO/FINANCIERO";
-                //            inactivoFinanciero.Riesgo = list[1].ToString();
-                //            inactivoFinanciero.MacroSector = list[2].ToString();
-                //            inactivoFinanciero.Sector = list[3].ToString();
-                //            inactivoFinanciero.Act_economica = list[4].ToString();
-                //            inactivoFinanciero.Cartera = list[5].ToString();
-                //            inactivoFinanciero.Activo_Cte = list[6].ToString();
-                //            inactivoFinanciero.Cartera_AnioAnterior = list[7].ToString();
-                //            inactivoFinanciero.Inventario = list[8].ToString();
-                //            inactivoFinanciero.Inventario_AnioAnterior = list[9].ToString();
-                //            inactivoFinanciero.Pasivo_Cte = list[10].ToString();
-                //            inactivoFinanciero.Obligaciones_Financieras = list[11].ToString();
-                //            inactivoFinanciero.Proveedores = list[12].ToString();
-                //            inactivoFinanciero.Proveedores_AnioAnterior = list[13].ToString();
-                //            inactivoFinanciero.Costos = list[14].ToString();
-                //            inactivoFinanciero.Utilidad_Operacional = list[15].ToString();
-                //            inactivoFinanciero.Gastos_no_Operativos = list[16].ToString();
-                //            inactivoFinanciero.Utilidad_Neta = list[17].ToString();
-                //            inactivoFinanciero.Ebitda = list[18].ToString();
-                //            inactivoFinanciero.Total_de_activos = list[19].ToString();
-                //            inactivoFinanciero.Total_pasivo = list[20].ToString();
-                //            inactivoFinanciero.Total_patrimonio = list[21].ToString();
-                //            inactivoFinanciero.Ingresos = list[22].ToString();
-                //            inactivoFinanciero.FechaConsulta = DateTime.Now;
-                //            inactivoFinanciero.Id_carga_inactivo = idCarga_inactivo;
-
-                //            Console.WriteLine(Line);
-                //            collectionInactivo.Add(inactivoFinanciero);
-                //        }
-                //        else
-                //        {
-                //            header = Line.Split(";");
-                //        }
-                //        count++;
-                //    }
-
-                //    if (collection.Count > 0)
-                //    {
-                //        IMongoCollection<ScoInactivoFinanciero> collectionNue = database.GetCollection<ScoInactivoFinanciero>("sco_inactivoantiguos");
-                //        await collectionNue.InsertManyAsync(collectionInactivo);
-
-                //    }
-                //    bool retornoCopy = Copy(blobName);
-                //    if (retornoCopy)
-                //    {
-                //        return ("INACTIVO");
-                //    }
-                //}
                 return "";
             }
             catch (Exception ex)
