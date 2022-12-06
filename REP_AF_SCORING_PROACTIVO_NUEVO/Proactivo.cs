@@ -1,14 +1,21 @@
 using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using Newtonsoft.Json;
 using REP_AF_SCORING_PROACTIVO.Model;
 using REP_AF_SCORING_PROACTIVO_NUEVO.Model;
+using SharpCompress.Common;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection.Metadata;
 using System.Threading.Tasks;
 
 namespace REP_AF_SCORING_PROACTIVO
@@ -19,69 +26,101 @@ namespace REP_AF_SCORING_PROACTIVO
         public static string idCarga_input = "";
         public static string idCarga_inactivo = "";
 
-        //Consulta en el Storage el .csv de los clientes Antiguos
         [FunctionName("Proactivo")]
-        public static async Task Run([BlobTrigger("output/proactivo/{name}", Connection = "BlobConnecctionScoring")] Stream myBlob, string name, ILogger log)
+        public static async Task<IActionResult> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)] HttpRequest req,
+            ILogger log)
         {
+            await BlobScan(log);
 
-            log.LogInformation($"C# Blob trigger function Processed blob\n Name:{name} \n Size: {myBlob.Length} Bytes");
+            log.LogInformation("C# HTTP trigger function processed a request.");;
 
-            //Valida el archivo con la extension necesaria.
-            if (name.Contains("csv"))
+            string responseMessage = "This HTTP triggered function executed successfully";
+
+            return new OkObjectResult(responseMessage);
+        }
+
+
+        //Consulta en el Storage el .csv de los clientes Antiguos
+        //private static async Task Run([BlobTrigger("output/proactivo/{name}", Connection = "BlobConnecctionScoring")] Stream myBlob, string name, ILogger log)
+        private static async Task BlobScan(ILogger log)
+        {
+            //BlobServiceClient blobServiceClient = new BlobServiceClient(Environment.GetEnvironmentVariable("BlobConnecctionScoring"));
+            //BlobContainerClient blobContainerClient = blobServiceClient.GetBlobContainerClient(Environment.GetEnvironmentVariable("ContainerName"));
+
+            BlobServiceClient blobServiceClient = new BlobServiceClient("DefaultEndpointsProtocol=https;AccountName=finaktivastorageprod;AccountKey=rCc2R66G4QsW8TcBo3mJre4H3aI46y4FzovQWRlZs7TswpmsTLlkGYXE8MNx6h59R2MRwu/++OtJ3Tjkb1MYuA==;BlobEndpoint=https://finaktivastorageprod.blob.core.windows.net/;TableEndpoint=https://finaktivastorageprod.table.core.windows.net/;QueueEndpoint=https://finaktivastorageprod.queue.core.windows.net/;FileEndpoint=https://finaktivastorageprod.file.core.windows.net/");
+            BlobContainerClient blobContainerClient = blobServiceClient.GetBlobContainerClient("output");
+
+            var blobs = blobContainerClient.GetBlobsAsync();
+            await foreach (BlobItem blobItem in blobs)
             {
+                var name = blobItem.Name;
+                var length = blobItem.Properties.ContentLength;
+ 
+                log.LogInformation($"C# Blob trigger function Processed blob\n Name:{name} \n Size: {length} Bytes");
 
-                if (string.IsNullOrEmpty(idCarga_input))
+                //Valida el archivo con la extension necesaria.
+                if (name.Contains("csv"))
                 {
-                    //SE CARGA EL ID DEL HISTORICO INPUT
-                    idCarga_input = await GetInputByEstatus();
-                }
+                    BlobClient blobClient = blobContainerClient.GetBlobClient(name);
+                    MemoryStream memoryStream = new MemoryStream();
+                    
+                    var response = blobClient.DownloadTo(memoryStream);
+                    memoryStream.Position = 0;
 
-                if (string.IsNullOrEmpty(idCarga_inactivo))
-                {
-                    //SE CARGA EL ID DEL HISTORICO INACTIVO
-                    idCarga_inactivo = await GetIdHistoricoInactivo();
-                }
-
-
-
-                if (!string.IsNullOrEmpty(idCarga_input) || !string.IsNullOrEmpty(idCarga_inactivo))
-                {
-
-                    //REALIZAMOS LOS INSERT
-                    string control = await InsertData(new StreamReader(myBlob), name, idCarga_input, idCarga_inactivo);
-
-
-                    if (control == "PROACTIVO")
+                    if (string.IsNullOrEmpty(idCarga_input))
                     {
-                        //ACTUALIZAR ESTADO DE LA CARGA EN HISTORICO INPUT
-                        MongoClient cli = new MongoClient(Environment.GetEnvironmentVariable("MongoDBAtlasConnectionString"));
-                        IMongoDatabase database = cli.GetDatabase("pladik");
-                        var collection = database.GetCollection<BsonDocument>("sco_cargahistoricoinputs");
+                        //SE CARGA EL ID DEL HISTORICO INPUT
+                        idCarga_input = await GetInputByEstatus();
+                    }
 
-                        //filtrar por _id
-                        var filter = Builders<BsonDocument>.Filter.Eq("Estado", 0);
-                        var update = Builders<BsonDocument>.Update.Set("Estado", 1);
-                        collection.UpdateOne(filter, update);
+                    if (string.IsNullOrEmpty(idCarga_inactivo))
+                    {
+                        //SE CARGA EL ID DEL HISTORICO INACTIVO
+                        idCarga_inactivo = await GetIdHistoricoInactivo();
                     }
 
 
-                    if (control == "INACTIVO")
-                    {
-                        //ACTUALIZAR ESTADO DE LA CARGA EN HISTORICO INACTIVO
-                        MongoClient cli = new MongoClient(Environment.GetEnvironmentVariable("MongoDBAtlasConnectionString"));
-                        IMongoDatabase database = cli.GetDatabase("pladik");
-                        var collection = database.GetCollection<BsonDocument>("sco_cargahistoricoinactivos");
 
-                        //filtrar por _id
-                        var filter = Builders<BsonDocument>.Filter.Eq("Estado", 0);
-                        var update = Builders<BsonDocument>.Update.Set("Estado", 1);
-                        collection.UpdateOne(filter, update);
+                    if (!string.IsNullOrEmpty(idCarga_input) || !string.IsNullOrEmpty(idCarga_inactivo))
+                    {
+
+                        //REALIZAMOS LOS INSERT
+                        string control = await InsertData(new StreamReader(memoryStream), name, idCarga_input, idCarga_inactivo);
+
+
+                        if (control == "PROACTIVO")
+                        {
+                            //ACTUALIZAR ESTADO DE LA CARGA EN HISTORICO INPUT
+                            MongoClient cli = new MongoClient(Environment.GetEnvironmentVariable("MongoDBAtlasConnectionString"));
+                            IMongoDatabase database = cli.GetDatabase("pladik");
+                            var collection = database.GetCollection<BsonDocument>("sco_cargahistoricoinputs");
+
+                            //filtrar por _id
+                            var filter = Builders<BsonDocument>.Filter.Eq("Estado", 0);
+                            var update = Builders<BsonDocument>.Update.Set("Estado", 1);
+                            collection.UpdateOne(filter, update);
+                        }
+
+
+                        if (control == "INACTIVO")
+                        {
+                            //ACTUALIZAR ESTADO DE LA CARGA EN HISTORICO INACTIVO
+                            MongoClient cli = new MongoClient(Environment.GetEnvironmentVariable("MongoDBAtlasConnectionString"));
+                            IMongoDatabase database = cli.GetDatabase("pladik");
+                            var collection = database.GetCollection<BsonDocument>("sco_cargahistoricoinactivos");
+
+                            //filtrar por _id
+                            var filter = Builders<BsonDocument>.Filter.Eq("Estado", 0);
+                            var update = Builders<BsonDocument>.Update.Set("Estado", 1);
+                            collection.UpdateOne(filter, update);
+                        }
+
                     }
 
                 }
 
             }
-
         }
 
 
