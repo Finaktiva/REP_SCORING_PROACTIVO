@@ -28,12 +28,12 @@ namespace REP_AF_SCORING_PROACTIVO
 
         [FunctionName("Proactivo")]
         public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)] HttpRequest req,
+            [HttpTrigger(AuthorizationLevel.Function, "post", Route = "processProactivoBlob")] HttpRequest req,
             ILogger log)
         {
-            await BlobScan(log);
+            log.LogInformation("C# HTTP trigger function processed a request.");
 
-            log.LogInformation("C# HTTP trigger function processed a request.");;
+            await BlobScan(log);
 
             string responseMessage = "This HTTP triggered function executed successfully";
 
@@ -57,15 +57,14 @@ namespace REP_AF_SCORING_PROACTIVO
                 var name = blobItem.Name;
                 var length = blobItem.Properties.ContentLength;
  
-                log.LogInformation($"C# Blob trigger function Processed blob\n Name:{name} \n Size: {length} Bytes");
+                log.LogInformation($"C# Http Blob trigger function Processed blob\n Name:{name} \n Size: {length} Bytes");
 
                 //Valida el archivo con la extension necesaria.
                 if (name.Contains("csv"))
                 {
                     BlobClient blobClient = blobContainerClient.GetBlobClient(name);
                     MemoryStream memoryStream = new MemoryStream();
-                    
-                    var response = blobClient.DownloadTo(memoryStream);
+                    blobClient.DownloadTo(memoryStream);
                     memoryStream.Position = 0;
 
                     if (string.IsNullOrEmpty(idCarga_input))
