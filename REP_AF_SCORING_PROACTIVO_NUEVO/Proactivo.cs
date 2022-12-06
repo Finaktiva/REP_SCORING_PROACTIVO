@@ -49,7 +49,7 @@ namespace REP_AF_SCORING_PROACTIVO
             BlobServiceClient blobServiceClient = new BlobServiceClient(Environment.GetEnvironmentVariable("BlobConnecctionScoring"));
             BlobContainerClient blobContainerClient = blobServiceClient.GetBlobContainerClient(Environment.GetEnvironmentVariable("ContainerName"));
 
-            var blobs = blobContainerClient.GetBlobsAsync();
+            var blobs = blobContainerClient.GetBlobsAsync(BlobTraits.All, BlobStates.All, "proactivo/");
             await foreach (BlobItem blobItem in blobs)
             {
                 var name = blobItem.Name;
@@ -61,58 +61,61 @@ namespace REP_AF_SCORING_PROACTIVO
                 if (name.Contains(".csv") || name.Contains(".CSV"))
                 {
                     BlobClient blobClient = blobContainerClient.GetBlobClient(name);
-                    MemoryStream memoryStream = new MemoryStream();
-                    blobClient.DownloadTo(memoryStream);
-                    memoryStream.Position = 0;
 
-                    if (string.IsNullOrEmpty(idCarga_input))
+                    using (var memoryStream = new MemoryStream())
                     {
-                        //SE CARGA EL ID DEL HISTORICO INPUT
-                        idCarga_input = await GetInputByEstatus();
-                    }
+                        blobClient.DownloadTo(memoryStream);
+                        memoryStream.Position = 0;
 
-                    if (string.IsNullOrEmpty(idCarga_inactivo))
-                    {
-                        //SE CARGA EL ID DEL HISTORICO INACTIVO
-                        idCarga_inactivo = await GetIdHistoricoInactivo();
-                    }
-
-
-
-                    if (!string.IsNullOrEmpty(idCarga_input) || !string.IsNullOrEmpty(idCarga_inactivo))
-                    {
-
-                        //REALIZAMOS LOS INSERT
-                        string control = await InsertData(new StreamReader(memoryStream), name, idCarga_input, idCarga_inactivo);
-
-
-                        if (control == "PROACTIVO")
+                        if (string.IsNullOrEmpty(idCarga_input))
                         {
-                            //ACTUALIZAR ESTADO DE LA CARGA EN HISTORICO INPUT
-                            MongoClient cli = new MongoClient(Environment.GetEnvironmentVariable("MongoDBAtlasConnectionString"));
-                            IMongoDatabase database = cli.GetDatabase("pladik");
-                            var collection = database.GetCollection<BsonDocument>("sco_cargahistoricoinputs");
+                            //SE CARGA EL ID DEL HISTORICO INPUT
+                            idCarga_input = await GetInputByEstatus();
+                        }
 
-                            //filtrar por _id
-                            var filter = Builders<BsonDocument>.Filter.Eq("Estado", 0);
-                            var update = Builders<BsonDocument>.Update.Set("Estado", 1);
-                            collection.UpdateOne(filter, update);
+                        if (string.IsNullOrEmpty(idCarga_inactivo))
+                        {
+                            //SE CARGA EL ID DEL HISTORICO INACTIVO
+                            idCarga_inactivo = await GetIdHistoricoInactivo();
                         }
 
 
-                        if (control == "INACTIVO")
+
+                        if (!string.IsNullOrEmpty(idCarga_input) || !string.IsNullOrEmpty(idCarga_inactivo))
                         {
-                            //ACTUALIZAR ESTADO DE LA CARGA EN HISTORICO INACTIVO
-                            MongoClient cli = new MongoClient(Environment.GetEnvironmentVariable("MongoDBAtlasConnectionString"));
-                            IMongoDatabase database = cli.GetDatabase("pladik");
-                            var collection = database.GetCollection<BsonDocument>("sco_cargahistoricoinactivos");
 
-                            //filtrar por _id
-                            var filter = Builders<BsonDocument>.Filter.Eq("Estado", 0);
-                            var update = Builders<BsonDocument>.Update.Set("Estado", 1);
-                            collection.UpdateOne(filter, update);
+                            //REALIZAMOS LOS INSERT
+                            string control = await InsertData(new StreamReader(memoryStream), name, idCarga_input, idCarga_inactivo);
+
+
+                            if (control == "PROACTIVO")
+                            {
+                                //ACTUALIZAR ESTADO DE LA CARGA EN HISTORICO INPUT
+                                MongoClient cli = new MongoClient(Environment.GetEnvironmentVariable("MongoDBAtlasConnectionString"));
+                                IMongoDatabase database = cli.GetDatabase("pladik");
+                                var collection = database.GetCollection<BsonDocument>("sco_cargahistoricoinputs");
+
+                                //filtrar por _id
+                                var filter = Builders<BsonDocument>.Filter.Eq("Estado", 0);
+                                var update = Builders<BsonDocument>.Update.Set("Estado", 1);
+                                collection.UpdateOne(filter, update);
+                            }
+
+
+                            if (control == "INACTIVO")
+                            {
+                                //ACTUALIZAR ESTADO DE LA CARGA EN HISTORICO INACTIVO
+                                MongoClient cli = new MongoClient(Environment.GetEnvironmentVariable("MongoDBAtlasConnectionString"));
+                                IMongoDatabase database = cli.GetDatabase("pladik");
+                                var collection = database.GetCollection<BsonDocument>("sco_cargahistoricoinactivos");
+
+                                //filtrar por _id
+                                var filter = Builders<BsonDocument>.Filter.Eq("Estado", 0);
+                                var update = Builders<BsonDocument>.Update.Set("Estado", 1);
+                                collection.UpdateOne(filter, update);
+                            }
+
                         }
-
                     }
 
                 }

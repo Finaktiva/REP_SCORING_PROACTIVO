@@ -1,11 +1,11 @@
 {
     "IsEncrypted": false,
-  "Values": {
-    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "FUNCTIONS_WORKER_RUNTIME": "dotnet",
-    "MongoDBAtlasConnectionString": "mongodb+srv://app_pladik_web_api_qa:jZ1aCIe2LFQHxlvV@clusterfinaktivaqa.davw0.mongodb.net/?retryWrites=true",
-    "BlobConnecctionScoring": "DefaultEndpointsProtocol=https;AccountName=finaktivastorageprod;AccountKey=rCc2R66G4QsW8TcBo3mJre4H3aI46y4FzovQWRlZs7TswpmsTLlkGYXE8MNx6h59R2MRwu/++OtJ3Tjkb1MYuA==;BlobEndpoint=https://finaktivastorageprod.blob.core.windows.net/;TableEndpoint=https://finaktivastorageprod.table.core.windows.net/;QueueEndpoint=https://finaktivastorageprod.queue.core.windows.net/;FileEndpoint=https://finaktivastorageprod.file.core.windows.net/",
-    "ContainerName": "output",
-    "blobCopy": "output/old/"
-  }
+    "Values": {
+        "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+        "FUNCTIONS_WORKER_RUNTIME": "dotnet",
+        "MongoDBAtlasConnectionString": "mongodb+srv://app_pladik_web_api_pdn:Xjc1brL1dcjwCd60@clusterfinaktivapdn.g8r0n.mongodb.net/?retryWrites=true",
+        "BlobConnecctionScoring": "DefaultEndpointsProtocol=https;AccountName=finaktivastorageprod;AccountKey=rCc2R66G4QsW8TcBo3mJre4H3aI46y4FzovQWRlZs7TswpmsTLlkGYXE8MNx6h59R2MRwu/++OtJ3Tjkb1MYuA==;BlobEndpoint=https://finaktivastorageprod.blob.core.windows.net/;TableEndpoint=https://finaktivastorageprod.table.core.windows.net/;QueueEndpoint=https://finaktivastorageprod.queue.core.windows.net/;FileEndpoint=https://finaktivastorageprod.file.core.windows.net/",
+        "ContainerName": "output",
+        "blobCopy": "output/old/"
+    }
 }
