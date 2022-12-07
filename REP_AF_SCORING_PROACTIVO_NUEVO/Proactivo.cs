@@ -169,7 +169,7 @@ namespace REP_AF_SCORING_PROACTIVO
             var blobContainerClient = new BlobContainerClient(storageConnectionString, containerName);
             var blobContainerClientCopy = new BlobContainerClient(storageConnectionString, containerName);
 
-            if (name.Contains("csv"))
+            if (name.Contains(".csv") || name.Contains(".CSV"))
             {
                 //var blobClient = blobContainerClient.GetBlobClient("proactivo/" + name);
                 var blobClient = blobContainerClient.GetBlobClient(name);
