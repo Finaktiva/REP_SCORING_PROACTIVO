@@ -17,7 +17,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection.Metadata;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Timers;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace REP_AF_SCORING_PROACTIVO
 {
@@ -34,18 +37,25 @@ namespace REP_AF_SCORING_PROACTIVO
         {
             log.LogInformation("C# HTTP trigger function processed a request.");
 
-            BlobScan(log);
+            Thread.CurrentThread.Name = "Blob";
+
+            // Create a task and supply a user delegate by using a lambda expression.
+            Task taskA = new Task(() => BlobScan(log));
+            
+            // Start the task.
+            taskA.Start();
 
             string responseMessage = "This HTTP triggered function executed successfully";
 
             return new OkObjectResult(responseMessage);
         }
 
-
         //Consulta en el Storage el .csv de los clientes Antiguos
         //private static async Task Run([BlobTrigger("output/proactivo/{name}", Connection = "BlobConnecctionScoring")] Stream myBlob, string name, ILogger log)
-        private static void BlobScan(ILogger log)
+        private static async Task BlobScan(ILogger log)
         {
+            System.Threading.Thread.Sleep(600000);
+
             BlobServiceClient blobServiceClient = new BlobServiceClient(Environment.GetEnvironmentVariable("BlobConnecctionScoring"));
             BlobContainerClient blobContainerClient = blobServiceClient.GetBlobContainerClient(Environment.GetEnvironmentVariable("ContainerName"));
 
