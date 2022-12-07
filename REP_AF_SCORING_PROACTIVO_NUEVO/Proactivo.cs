@@ -28,13 +28,13 @@ namespace REP_AF_SCORING_PROACTIVO
         public static string idCarga_inactivo = "";
 
         [FunctionName("Proactivo")]
-        public static async Task<IActionResult> Run(
+        public static IActionResult Run(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "processProactivoBlob")] HttpRequest req,
             ILogger log)
         {
             log.LogInformation("C# HTTP trigger function processed a request.");
 
-            await BlobScan(log);
+            BlobScan(log);
 
             string responseMessage = "This HTTP triggered function executed successfully";
 
@@ -44,13 +44,13 @@ namespace REP_AF_SCORING_PROACTIVO
 
         //Consulta en el Storage el .csv de los clientes Antiguos
         //private static async Task Run([BlobTrigger("output/proactivo/{name}", Connection = "BlobConnecctionScoring")] Stream myBlob, string name, ILogger log)
-        private static async Task BlobScan(ILogger log)
+        private static void BlobScan(ILogger log)
         {
             BlobServiceClient blobServiceClient = new BlobServiceClient(Environment.GetEnvironmentVariable("BlobConnecctionScoring"));
             BlobContainerClient blobContainerClient = blobServiceClient.GetBlobContainerClient(Environment.GetEnvironmentVariable("ContainerName"));
 
-            var blobs = blobContainerClient.GetBlobsAsync(BlobTraits.All, BlobStates.All, "proactivo/");
-            await foreach (BlobItem blobItem in blobs)
+            var blobs = blobContainerClient.GetBlobs(BlobTraits.All, BlobStates.All, "proactivo/");
+            foreach (BlobItem blobItem in blobs)
             {
                 var name = blobItem.Name;
                 var length = blobItem.Properties.ContentLength;
@@ -70,13 +70,13 @@ namespace REP_AF_SCORING_PROACTIVO
                         if (string.IsNullOrEmpty(idCarga_input))
                         {
                             //SE CARGA EL ID DEL HISTORICO INPUT
-                            idCarga_input = await GetInputByEstatus();
+                            idCarga_input = GetInputByEstatus();
                         }
 
                         if (string.IsNullOrEmpty(idCarga_inactivo))
                         {
                             //SE CARGA EL ID DEL HISTORICO INACTIVO
-                            idCarga_inactivo = await GetIdHistoricoInactivo();
+                            idCarga_inactivo = GetIdHistoricoInactivo();
                         }
 
 
@@ -85,7 +85,7 @@ namespace REP_AF_SCORING_PROACTIVO
                         {
 
                             //REALIZAMOS LOS INSERT
-                            string control = await InsertData(new StreamReader(memoryStream), name, idCarga_input, idCarga_inactivo);
+                            string control = InsertData(new StreamReader(memoryStream), name, idCarga_input, idCarga_inactivo);
 
 
                             if (control == "PROACTIVO")
@@ -125,12 +125,12 @@ namespace REP_AF_SCORING_PROACTIVO
 
 
 
-        private static async Task<string> GetInputByEstatus()
+        private static string GetInputByEstatus()
         {
             MongoClient client = new MongoClient(Environment.GetEnvironmentVariable("MongoDBAtlasConnectionString"));
             IMongoDatabase database = client.GetDatabase("pladik");
             var collection = database.GetCollection<BsonDocument>("sco_cargahistoricoinputs");
-            var documents = await collection.FindAsync(new BsonDocument("Estado", 0)).Result.FirstOrDefaultAsync();
+            var documents = collection.Find(new BsonDocument("Estado", 0)).FirstOrDefault();
 
             if (documents != null)
             {
@@ -142,12 +142,12 @@ namespace REP_AF_SCORING_PROACTIVO
             }
         }
 
-        private static async Task<string> GetIdHistoricoInactivo()
+        private static string GetIdHistoricoInactivo()
         {
             MongoClient client = new MongoClient(Environment.GetEnvironmentVariable("MongoDBAtlasConnectionString"));
             IMongoDatabase database = client.GetDatabase("pladik");
             var collection = database.GetCollection<BsonDocument>("sco_cargahistoricoinactivos");
-            var documents = await collection.FindAsync(new BsonDocument("Estado", 0)).Result.FirstOrDefaultAsync();
+            var documents = collection.Find(new BsonDocument("Estado", 0)).FirstOrDefault();
 
             if (documents != null)
             {
@@ -171,7 +171,8 @@ namespace REP_AF_SCORING_PROACTIVO
 
             if (name.Contains("csv"))
             {
-                var blobClient = blobContainerClient.GetBlobClient("proactivo/" + name);
+                //var blobClient = blobContainerClient.GetBlobClient("proactivo/" + name);
+                var blobClient = blobContainerClient.GetBlobClient(name);
                 var blobsCopy = blobContainerClientCopy.GetBlobClient($"{Environment.GetEnvironmentVariable("blobCopy")}{name}");
                 blobsCopy.StartCopyFromUri(blobClient.Uri);
                 var response = blobClient.Delete();
@@ -188,7 +189,7 @@ namespace REP_AF_SCORING_PROACTIVO
 
         }
 
-        public static async Task<string> InsertData(StreamReader streamReader, string blobName, string idCarga_input, string idCarga_inactivo)
+        public static string InsertData(StreamReader streamReader, string blobName, string idCarga_input, string idCarga_inactivo)
         {
 
             try
@@ -254,7 +255,7 @@ namespace REP_AF_SCORING_PROACTIVO
                     if (collection.Count > 0)
                     {
                         IMongoCollection<ScoProactivoNuevo> collectionNue = database.GetCollection<ScoProactivoNuevo>("sco_proactivonuevos");
-                        await collectionNue.InsertManyAsync(collection);
+                        collectionNue.InsertMany(collection);
 
                     }
                     bool retornoCopy = Copy(blobName);
@@ -293,7 +294,7 @@ namespace REP_AF_SCORING_PROACTIVO
                     if (collection.Count > 0)
                     {
                         IMongoCollection<ScoProactivoNuevo> collectionNue = database.GetCollection<ScoProactivoNuevo>("sco_proactivonuevos");
-                        await collectionNue.InsertManyAsync(collection);
+                        collectionNue.InsertMany(collection);
 
                     }
                     bool retornoCopy = Copy(blobName);
@@ -334,7 +335,7 @@ namespace REP_AF_SCORING_PROACTIVO
                     if (collectionAntiguo.Count > 0)
                     {
                         IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_proactivoantiguos");
-                        await collectionNue.InsertManyAsync(collectionAntiguo);
+                        collectionNue.InsertMany(collectionAntiguo);
 
                     }
                     bool retornoCopy = Copy(blobName);
@@ -377,7 +378,7 @@ namespace REP_AF_SCORING_PROACTIVO
                     if (collectionAntiguo.Count > 0)
                     {
                         IMongoCollection<ScoProactivoAntiguo> collectionNue = database.GetCollection<ScoProactivoAntiguo>("sco_proactivoantiguos");
-                        await collectionNue.InsertManyAsync(collectionAntiguo);
+                        collectionNue.InsertMany(collectionAntiguo);
 
                     }
                     bool retornoCopy = Copy(blobName);
@@ -425,7 +426,7 @@ namespace REP_AF_SCORING_PROACTIVO
                     if (collectionInactivo.Count > 0)
                     {
                         IMongoCollection<ScoInactivo> collectionNue = database.GetCollection<ScoInactivo>("sco_inactivos");
-                        await collectionNue.InsertManyAsync(collectionInactivo);
+                        collectionNue.InsertMany(collectionInactivo);
 
                     }
                     bool retornoCopy = Copy(blobName);
@@ -472,7 +473,7 @@ namespace REP_AF_SCORING_PROACTIVO
                     if (collectionInactivo.Count > 0)
                     {
                         IMongoCollection<ScoInactivo> collectionNue = database.GetCollection<ScoInactivo>("sco_inactivos");
-                        await collectionNue.InsertManyAsync(collectionInactivo);
+                        collectionNue.InsertMany(collectionInactivo);
                     }
                     bool retornoCopy = Copy(blobName);
                     if (retornoCopy)
